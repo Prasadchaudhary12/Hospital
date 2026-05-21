@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 
 # ------------------------------
-# GLOBAL STYLE
+# GLOBAL STYLE (PURE YELLOW)
 # ------------------------------
 st.set_page_config(layout="wide")
 
@@ -18,7 +18,7 @@ body, html, [class*="css"] {
     background-color: #000000;
     color: white;
     padding: 12px;
-    border-left: 6px solid #FFC000;
+    border-left: 6px solid #FFFF00;
 }
 
 /* Cards */
@@ -32,21 +32,21 @@ body, html, [class*="css"] {
 
 /* Section Titles */
 .section-title {
-    background-color: #FFF2CC;
+    background-color: #FFFFE0;
     padding: 8px;
-    border-left: 5px solid #FFC000;
+    border-left: 5px solid #FFFF00;
     font-weight: bold;
 }
 
-/* Buttons (default = yellow theme) */
+/* Buttons (Yellow Theme) */
 .stButton > button {
-    background-color: #FFC000;
+    background-color: #FFFF00;
     color: black;
     border-radius: 6px;
     font-weight: bold;
 }
 
-/* Archive buttons override */
+/* Archive buttons override (NO YELLOW) */
 .archive-btn > button {
     background-color: #333333 !important;
     color: white !important;
@@ -232,7 +232,7 @@ def dashboard():
     c3.metric("Fail", fail_c)
 
 # ------------------------------
-# ✅ ARCHIVE (NO YELLOW)
+# ARCHIVE (NO YELLOW)
 # ------------------------------
 def archive_page():
     st.markdown("<div class='header-box'><h3>Audit Document Archive</h3></div>", unsafe_allow_html=True)
@@ -249,7 +249,7 @@ def archive_page():
 
             with col1:
                 st.markdown("<div class='card'>", unsafe_allow_html=True)
-                file = st.file_uploader(f"Upload {doc}", key=f"{doc}_upload")
+                st.file_uploader(f"Upload {doc}", key=f"{doc}_upload")
                 notes = st.text_area("Notes", key=f"{doc}_notes")
                 st.markdown("</div>", unsafe_allow_html=True)
 
@@ -269,6 +269,7 @@ def archive_page():
                     log(f"{doc} Archived")
                     st.success(f"{doc} archived")
                 st.markdown("</div>", unsafe_allow_html=True)
+
                 st.markdown("</div>", unsafe_allow_html=True)
 
     if st.session_state.doc_archive:
