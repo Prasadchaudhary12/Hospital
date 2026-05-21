@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 
 # ------------------------------
-# GLOBAL STYLE
+# GLOBAL STYLE (UPDATED)
 # ------------------------------
 st.set_page_config(layout="wide")
 
@@ -12,30 +12,52 @@ st.markdown("""
 body, html, [class*="css"] {
     font-family: Calibri;
 }
-.main {
-    background-color: #F5F5F5;
-}
+
 .header-box {
     background-color: #000000;
     color: white;
     padding: 10px;
-    border-left: 5px solid yellow;
+    border-left: 5px solid #FFC000;
 }
+
 .card {
     background-color: white;
-    border: 1px solid grey;
+    border: 1px solid #D9D9D9;
     padding: 15px;
-    border-radius: 10px;
+    border-radius: 8px;
+    margin-bottom: 10px;
 }
-button {
-    background-color: yellow !important;
-    color: black !important;
+
+.section-title {
+    background-color: #F2F2F2;
+    padding: 8px;
+    border-left: 4px solid #FFC000;
+    font-weight: bold;
+}
+
+.stButton > button {
+    background-color: #333333;
+    color: white;
+    border-radius: 6px;
+}
+
+/* Tabs Styling */
+.stTabs [role="tab"] {
+    background-color: #E6E6E6;
+    padding: 8px;
+    border-radius: 6px;
+    margin-right: 4px;
+}
+
+.stTabs [aria-selected="true"] {
+    background-color: #333333;
+    color: white;
 }
 </style>
 """, unsafe_allow_html=True)
 
 # ------------------------------
-# SESSION STATE INITIALIZATION
+# SESSION INIT
 # ------------------------------
 def init_session():
     defaults = {
@@ -45,10 +67,9 @@ def init_session():
         "engagements": [],
         "checklists": {},
         "logs": [],
-        "archives": [],
         "doc_archive": []
     }
-    for k, v in defaults.items():
+    for k,v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
 
@@ -73,133 +94,94 @@ def login_page():
     col1, col2, col3 = st.columns([2,3,2])
     with col2:
         st.markdown("<div class='card'>", unsafe_allow_html=True)
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-
+        u = st.text_input("Username")
+        p = st.text_input("Password", type="password")
         if st.button("Login"):
-            if username == "admin" and password == "admin":
+            if u == "admin" and p == "admin":
                 st.session_state.logged_in = True
-                st.session_state.user = username
+                st.session_state.user = u
                 log("Login")
                 st.rerun()
             else:
-                st.error("Invalid credentials")
+                st.error("Invalid Credentials")
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ------------------------------
 # HOME
 # ------------------------------
 def home():
-    st.markdown("<div class='header-box'><h3>Welcome to Internal Audit QA Tool</h3></div>", unsafe_allow_html=True)
-
-    st.markdown("""
-    <div class='card'>
-    <b>Capabilities:</b>
-    <ul>
-    <li>Client & Engagement Management</li>
-    <li>Checklist-driven QA System</li>
-    <li>Document tagging & archival</li>
-    <li>Dashboard analytics</li>
-    <li>Audit Logs & Reporting</li>
-    </ul>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown("<div class='header-box'><h3>Welcome</h3></div>", unsafe_allow_html=True)
+    st.markdown("<div class='card'>Enterprise Internal Audit QA Platform</div>", unsafe_allow_html=True)
 
 # ------------------------------
-# CLIENT MANAGEMENT
+# CLIENTS
 # ------------------------------
 def client_page():
     st.header("Client Management")
-
-    name = st.text_input("Client Name", key="client")
+    name = st.text_input("Client Name")
     if st.button("Add Client"):
         if name:
             st.session_state.clients.append(name)
             log("Client Created")
-
     if st.session_state.clients:
-        df = pd.DataFrame(st.session_state.clients, columns=["Clients"])
-        st.dataframe(df)
+        st.dataframe(pd.DataFrame(st.session_state.clients, columns=["Clients"]))
 
 # ------------------------------
-# ENGAGEMENT MANAGEMENT
+# ENGAGEMENTS
 # ------------------------------
 def engagement_page():
     st.header("Engagement Management")
 
     client = st.selectbox("Client", st.session_state.clients if st.session_state.clients else ["None"])
     fy = st.text_input("Financial Year")
-    process = st.text_input("Audit Process")
-    auditor = st.text_input("Auditor")
-    auditee = st.text_input("Auditee")
-    dept = st.text_input("Department")
-    title = st.text_input("Title")
+    process = st.text_input("Process")
 
     if st.button("Create Engagement"):
-        eg = {
-            "id": len(st.session_state.engagements)+1,
+        eid = len(st.session_state.engagements) + 1
+        st.session_state.engagements.append({
+            "id": eid,
             "client": client,
             "fy": fy,
             "process": process,
             "status": "Not Started"
-        }
-        st.session_state.engagements.append(eg)
-        st.session_state.checklists[eg["id"]] = generate_checklist()
+        })
+        st.session_state.checklists[eid] = generate_checklist()
         log("Engagement Created")
 
+    if st.session_state.engagements:
+        st.dataframe(pd.DataFrame(st.session_state.engagements))
+
 # ------------------------------
-# MASTER CHECKLIST
+# CHECKLIST MASTER
 # ------------------------------
 def generate_checklist():
     steps = ["Planning Review", "Fieldwork Review", "Reporting Review"]
-    return [{"step": s, "status": "Not Started", "remarks": "", "doc": None} for s in steps]
+    return [{"step": s, "status": "Not Started"} for s in steps]
 
 # ------------------------------
-# CHECKLIST SYSTEM
+# CHECKLIST
 # ------------------------------
 def checklist_page():
     st.header("Checklist")
 
     if not st.session_state.engagements:
-        st.warning("No Engagements")
         return
 
-    eg_ids = [e["id"] for e in st.session_state.engagements]
-    selected = st.selectbox("Select Engagement", eg_ids)
-
-    checklist = st.session_state.checklists[selected]
+    eid = st.selectbox("Engagement", [e["id"] for e in st.session_state.engagements])
+    checklist = st.session_state.checklists[eid]
 
     for i, step in enumerate(checklist):
         with st.expander(step["step"]):
-            st.file_uploader("Upload File", key=f"file_{selected}_{i}")
-            remarks = st.text_area("Remarks", key=f"remark_{selected}_{i}")
+            st.file_uploader("Upload Evidence", key=f"file_{eid}_{i}")
+            st.text_area("Remarks", key=f"remark_{eid}_{i}")
 
-            col1, col2, col3 = st.columns(3)
-            if col1.button("Pass", key=f"pass_{i}_{selected}"):
+            c1,c2,c3 = st.columns(3)
+            if c1.button("Pass", key=f"pass_{eid}_{i}"):
                 step["status"] = "Pass"
-            if col2.button("Fail", key=f"fail_{i}_{selected}"):
+            if c2.button("Fail", key=f"fail_{eid}_{i}"):
                 step["status"] = "Fail"
-            if col3.button("N/A", key=f"na_{i}_{selected}"):
+            if c3.button("N/A", key=f"na_{eid}_{i}"):
                 step["status"] = "N/A"
-
-            if st.button("Chat Assist", key=f"chat_{i}_{selected}"):
-                st.info("Suggested: Ensure documentation completeness.")
-
-            if st.button("Archive Doc", key=f"arc_{i}_{selected}"):
-                st.session_state.doc_archive.append({
-                    "Type": step["step"],
-                    "User": st.session_state.user,
-                    "Time": datetime.now().strftime("%Y-%m-%d %H:%M")
-                })
-                log("Document Archived")
-
-    if st.button("Sign Off"):
-        for step in checklist:
-            if step["status"] == "Not Started":
-                st.error("Complete all steps before sign-off")
-                return
-        st.success("QA Signed Off")
-        log("QA Signed Off")
 
 # ------------------------------
 # DASHBOARD
@@ -211,65 +193,65 @@ def dashboard():
     pass_c = fail_c = na_c = 0
 
     for c in st.session_state.checklists.values():
-        for step in c:
-            if step["status"] == "Pass":
+        for s in c:
+            if s["status"] == "Pass":
                 pass_c += 1
-            elif step["status"] == "Fail":
+            elif s["status"] == "Fail":
                 fail_c += 1
-            elif step["status"] == "N/A":
+            elif s["status"] == "N/A":
                 na_c += 1
 
-    df = pd.DataFrame({
-        "Status": ["Pass", "Fail", "N/A"],
-        "Count": [pass_c, fail_c, na_c]
-    })
-
-    st.bar_chart(df.set_index("Status"))
-
-    st.metric("Total QA Steps", total)
+    st.metric("Total QA", total)
     st.metric("Pass", pass_c)
     st.metric("Fail", fail_c)
 
 # ------------------------------
-# ✅ ENHANCED ARCHIVE PAGE
+# ✅ ARCHIVE (ENTERPRISE DESIGN)
 # ------------------------------
 def archive_page():
-    st.header("Audit Document Archive")
+    st.markdown("<div class='header-box'><h3>Audit Document Archive</h3></div>", unsafe_allow_html=True)
 
     doc_types = [
-        "Audit Report",
-        "RCM",
-        "Workpapers",
-        "Exhibits",
-        "Audit Program",
-        "Scoping Memo",
-        "Audit Evidence",
-        "Final Deliverables"
+        "Audit Report","RCM","Workpapers","Exhibits",
+        "Audit Program","Scoping Memo","Audit Evidence","Final Deliverables"
     ]
 
     tabs = st.tabs(doc_types)
 
     for idx, doc in enumerate(doc_types):
         with tabs[idx]:
-            st.subheader(f"{doc} Archive Section")
 
-            file = st.file_uploader(f"Upload {doc}", key=f"upload_{idx}")
-            notes = st.text_area(f"{doc} Notes / Description", key=f"notes_{idx}")
+            st.markdown(f"<div class='section-title'>{doc} Archive Section</div>", unsafe_allow_html=True)
 
-            if st.button(f"Archive {doc}", key=f"archive_btn_{idx}"):
-                st.session_state.doc_archive.append({
-                    "Document Type": doc,
-                    "User": st.session_state.user,
-                    "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "Notes": notes
-                })
-                log(f"{doc} Archived")
-                st.success(f"{doc} archived successfully")
+            col1, col2 = st.columns([2,1])
+
+            with col1:
+                st.markdown("<div class='card'>", unsafe_allow_html=True)
+                file = st.file_uploader(f"Upload {doc}", key=f"upload_{doc}")
+                notes = st.text_area("Document Notes", key=f"notes_{doc}")
+                st.markdown("</div>", unsafe_allow_html=True)
+
+            with col2:
+                st.markdown("<div class='card'>", unsafe_allow_html=True)
+                st.write("**Metadata**")
+                st.write(f"User: {st.session_state.user}")
+                st.write(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+
+                if st.button(f"Archive {doc}", key=f"archive_btn_{doc}"):
+                    st.session_state.doc_archive.append({
+                        "Document": doc,
+                        "User": st.session_state.user,
+                        "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "Notes": notes
+                    })
+                    log(f"{doc} Archived")
+                    st.success(f"{doc} archived successfully")
+
+                st.markdown("</div>", unsafe_allow_html=True)
 
     if st.session_state.doc_archive:
-        st.subheader("Archive Records")
-        df = pd.DataFrame(st.session_state.doc_archive)
-        st.dataframe(df)
+        st.markdown("<div class='section-title'>Archived Records</div>", unsafe_allow_html=True)
+        st.dataframe(pd.DataFrame(st.session_state.doc_archive), use_container_width=True)
 
 # ------------------------------
 # REPORT
@@ -277,62 +259,46 @@ def archive_page():
 def report_page():
     st.header("Report")
 
-    data = []
-    for eid, checklist in st.session_state.checklists.items():
-        for step in checklist:
-            data.append({
-                "Engagement": eid,
-                "Step": step["step"],
-                "Status": step["status"]
-            })
+    data=[]
+    for eid, c in st.session_state.checklists.items():
+        for s in c:
+            data.append({"Engagement":eid,"Step":s["step"],"Status":s["status"]})
 
     if data:
         df = pd.DataFrame(data)
         st.dataframe(df)
-        csv = df.to_csv(index=False).encode()
-        st.download_button("Download CSV", csv, "report.csv")
+        st.download_button("Download CSV", df.to_csv(index=False), "report.csv")
 
 # ------------------------------
 # LOGS
 # ------------------------------
 def logs_page():
     st.header("Audit Logs")
-
     if st.session_state.logs:
-        df = pd.DataFrame(st.session_state.logs)
-        st.dataframe(df)
+        st.dataframe(pd.DataFrame(st.session_state.logs))
 
 # ------------------------------
-# MAIN APP
+# MAIN
 # ------------------------------
 if not st.session_state.logged_in:
     login_page()
 else:
-    st.markdown(f"Logged in as: {st.session_state.user}")
+    st.write(f"Logged in as: {st.session_state.user}")
 
     menu = st.selectbox("Navigation",
-        ["Home", "Dashboard", "Clients", "Engagements",
-         "Checklist", "Report", "Archive", "Logs"]
+        ["Home","Dashboard","Clients","Engagements","Checklist","Archive","Report","Logs"]
     )
 
     if st.button("Logout"):
         log("Logout")
-        st.session_state.logged_in = False
+        st.session_state.logged_in=False
         st.rerun()
 
-    if menu == "Home":
-        home()
-    elif menu == "Dashboard":
-        dashboard()
-    elif menu == "Clients":
-        client_page()
-    elif menu == "Engagements":
-        engagement_page()
-    elif menu == "Checklist":
-        checklist_page()
-    elif menu == "Report":
-        report_page()
-    elif menu == "Archive":
-        archive_page()
-    elif menu == "Logs":
-        logs_page()
+    if menu=="Home": home()
+    elif menu=="Dashboard": dashboard()
+    elif menu=="Clients": client_page()
+    elif menu=="Engagements": engagement_page()
+    elif menu=="Checklist": checklist_page()
+    elif menu=="Archive": archive_page()
+    elif menu=="Report": report_page()
+    elif menu=="Logs": logs_page()
