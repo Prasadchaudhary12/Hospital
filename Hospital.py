@@ -316,4 +316,3 @@ else:
         archive_page()
     elif menu == "Logs":
         logs_page()
-``
