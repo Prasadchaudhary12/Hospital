@@ -1,192 +1,328 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+import datetime
 
-# --------------------------
-# File paths
-# --------------------------
-PATIENT_FILE = "patients.csv"
-DOCTOR_FILE = "doctors.csv"
-APPOINTMENT_FILE = "appointments.csv"
-BILL_FILE = "bills.csv"
+# ------------------------ CONFIG ------------------------
+st.set_page_config(page_title="Internal Audit QA Tool", layout="wide")
 
-# --------------------------
-# Load data
-# --------------------------
-def load_file(file, cols):
-    try:
-        return pd.read_csv(file)
-    except:
-        return pd.DataFrame(columns=cols)
+# ------------------------ STYLING ------------------------
+st.markdown("""
+<style>
+html, body { font-family: Calibri; color: black; }
+.stApp { background-color: #e6e6e6; }
 
-patients = load_file(PATIENT_FILE, ["Patient_ID", "Name", "Age", "Gender", "Contact"])
-doctors = load_file(DOCTOR_FILE, ["Doctor_ID", "Name", "Specialization"])
-appointments = load_file(APPOINTMENT_FILE, ["Appointment_ID", "Patient", "Doctor", "Date"])
-bills = load_file(BILL_FILE, ["Bill_ID", "Patient", "Amount", "Date"])
+/* HEADER */
+.header {
+    background-color: black;
+    color: #f1c40f;
+    padding: 14px;
+    border-radius: 6px;
+    text-align: center;
+}
 
-# --------------------------
-# Save function
-# --------------------------
-def save(df, file):
-    df.to_csv(file, index=False)
+/* LOGIN BOX */
+.login-box {
+    border: 3px solid #f1c40f;
+    padding: 25px;
+    border-radius: 10px;
+    background-color: white;
+}
 
-# --------------------------
-# UI Navigation
-# --------------------------
-st.set_page_config(page_title="Hospital Management System", layout="wide")
-menu = st.sidebar.selectbox("Menu", [
-    "Dashboard",
-    "Register Patient",
-    "Add Doctor",
-    "Book Appointment",
-    "Billing",
-    "Records"
-])
+/* SECTION */
+.section {
+    background-color: white;
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 10px;
+    border-left: 6px solid #f1c40f;
+}
 
-st.title("🏥 Hospital Management System")
+/* BUTTON */
+.stButton>button {
+    background-color: #f1c40f;
+    color: black;
+    font-weight: bold;
+    border-radius: 6px;
+}
+</style>
+""", unsafe_allow_html=True)
 
-# --------------------------
-# Dashboard
-# --------------------------
-if menu == "Dashboard":
-    col1, col2, col3, col4 = st.columns(4)
+# ------------------------ SESSION INIT ------------------------
+def init():
+    defaults = {
+        "users":{"admin":"admin"},
+        "login":False,
+        "user":"",
+        "clients":[],
+        "engagements":[],
+        "qa":[] ,
+        "logs":[],
+        "archive":[],
+    }
+    for k,v in defaults.items():
+        if k not in st.session_state:
+            st.session_state[k]=v
+init()
 
-    col1.metric("Total Patients", len(patients))
-    col2.metric("Doctors", len(doctors))
-    col3.metric("Appointments", len(appointments))
-    col4.metric("Total Revenue", f"₹ {bills['Amount'].sum() if not bills.empty else 0}")
+# ------------------------ LOGGER ------------------------
+def log(action):
+    st.session_state.logs.append({
+        "User":st.session_state.user,
+        "Action":action,
+        "Time":datetime.datetime.now()
+    })
 
-    st.subheader("📊 Appointments Trend")
-    if not appointments.empty:
-        appointments["Date"] = pd.to_datetime(appointments["Date"])
-        trend = appointments.groupby("Date").size()
-        st.line_chart(trend)
+# ------------------------ LOGIN ------------------------
+def login():
+    st.markdown("<h2 class='header'>Internal Audit QA System</h2>",unsafe_allow_html=True)
 
-# --------------------------
-# Register Patient
-# --------------------------
-elif menu == "Register Patient":
-    st.header("👤 Patient Registration")
+    c1,c2,c3 = st.columns([2,2,2])
+    with c2:
+        st.markdown("<div class='login-box'>",unsafe_allow_html=True)
 
-    with st.form("patient_form"):
-        name = st.text_input("Name")
-        age = st.number_input("Age", 0, 120)
-        gender = st.selectbox("Gender", ["Male", "Female", "Other"])
-        contact = st.text_input("Contact")
+        u = st.text_input("Username")
+        p = st.text_input("Password",type="password")
 
-        if st.form_submit_button("Register"):
-            pid = f"P{len(patients)+1}"
+        if st.button("Login",use_container_width=True):
+            if u in st.session_state.users and st.session_state.users[u]==p:
+                st.session_state.login=True
+                st.session_state.user=u
+                log("Login")
+                st.rerun()
+            else:
+                st.error("Invalid credentials")
 
-            new_patient = pd.DataFrame([{
-                "Patient_ID": pid,
-                "Name": name,
-                "Age": age,
-                "Gender": gender,
-                "Contact": contact
-            }])
+        st.markdown("</div>",unsafe_allow_html=True)
 
-            patients_df = pd.concat([patients, new_patient], ignore_index=True)
-            save(patients_df, PATIENT_FILE)
+# ------------------------ HEADER ------------------------
+def header():
+    col1,col2 = st.columns([8,2])
 
-            st.success(f"✅ Patient Registered with ID: {pid}")
+    col1.markdown("<div class='header'>🚆 Internal Audit QA Tool</div>", unsafe_allow_html=True)
 
-# --------------------------
-# Add Doctor
-# --------------------------
-elif menu == "Add Doctor":
-    st.header("👨‍⚕️ Add Doctor")
+    with col2:
+        st.write(f"👤 {st.session_state.user}")
+        if st.button("Logout"):
+            log("Logout")
+            st.session_state.login=False
+            st.rerun()
 
-    with st.form("doctor_form"):
-        name = st.text_input("Doctor Name")
-        specialization = st.text_input("Specialization")
+# ------------------------ DASHBOARD ------------------------
+def dashboard():
+    st.markdown("<div class='section'>",unsafe_allow_html=True)
+    st.subheader("📊 Dashboard")
 
-        if st.form_submit_button("Add Doctor"):
-            did = f"D{len(doctors)+1}"
+    df=pd.DataFrame(st.session_state.qa)
 
-            new_doc = pd.DataFrame([{
-                "Doctor_ID": did,
-                "Name": name,
-                "Specialization": specialization
-            }])
+    total=len(df)
+    pass_c=len(df[df.result=="Pass"]) if not df.empty else 0
+    fail_c=len(df[df.result=="Fail"]) if not df.empty else 0
+    na_c=total-pass_c-fail_c
 
-            doctor_df = pd.concat([doctors, new_doc], ignore_index=True)
-            save(doctor_df, DOCTOR_FILE)
+    completed = total
+    inprogress = 0
+    notstarted = max(0,len(st.session_state.engagements)-completed)
 
-            st.success(f"✅ Doctor Added with ID: {did}")
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("Total QA",total)
+    c2.metric("Completed",completed)
+    c3.metric("In Progress",inprogress)
+    c4.metric("Not Started",notstarted)
 
-# --------------------------
-# Book Appointment
-# --------------------------
-elif menu == "Book Appointment":
-    st.header("📅 Appointment Booking")
+    # chart
+    if total>0:
+        chart = pd.DataFrame({
+            "Status":["Pass","Fail","N/A"],
+            "Count":[pass_c,fail_c,na_c]
+        })
+        st.bar_chart(chart.set_index("Status"))
 
-    if patients.empty or doctors.empty:
-        st.warning("Please add patients and doctors first")
-    else:
-        with st.form("appointment_form"):
-            patient = st.selectbox("Select Patient", patients["Name"])
-            doctor = st.selectbox("Select Doctor", doctors["Name"])
-            date = st.date_input("Appointment Date")
+    st.markdown("</div>",unsafe_allow_html=True)
 
-            if st.form_submit_button("Book"):
-                aid = f"A{len(appointments)+1}"
+# ------------------------ CLIENT ------------------------
+def client():
+    st.markdown("<div class='section'>",unsafe_allow_html=True)
+    st.subheader("🏢 Client Management")
 
-                new_appt = pd.DataFrame([{
-                    "Appointment_ID": aid,
-                    "Patient": patient,
-                    "Doctor": doctor,
-                    "Date": date
-                }])
+    name=st.text_input("Client Name")
 
-                appt_df = pd.concat([appointments, new_appt], ignore_index=True)
-                save(appt_df, APPOINTMENT_FILE)
+    if st.button("Add Client") and name:
+        st.session_state.clients.append(name)
+        log("Client Created")
+        st.success("Client Added")
 
-                st.success(f"✅ Appointment booked! ID: {aid}")
+    st.dataframe(pd.DataFrame(st.session_state.clients,columns=["Clients"]))
+    st.markdown("</div>",unsafe_allow_html=True)
 
-# --------------------------
-# Billing
-# --------------------------
-elif menu == "Billing":
-    st.header("💳 Billing")
+# ------------------------ ENGAGEMENT ------------------------
+def engagement():
+    st.markdown("<div class='section'>",unsafe_allow_html=True)
+    st.subheader("📁 Create Engagement")
 
-    if patients.empty:
-        st.warning("No patients available")
-    else:
-        with st.form("billing_form"):
-            patient = st.selectbox("Select Patient", patients["Name"])
-            amount = st.number_input("Amount", min_value=0.0)
+    if not st.session_state.clients:
+        st.warning("Create client first")
+        return
 
-            if st.form_submit_button("Generate Bill"):
-                bid = f"B{len(bills)+1}"
+    client=st.selectbox("Client",st.session_state.clients)
+    fy=st.text_input("Financial Year")
+    process=st.text_input("Audit Process")
+    auditor=st.text_input("Auditor Name")
+    auditee=st.text_input("Auditee Name")
+    dept=st.text_input("Department")
+    title=st.text_input("Title")
 
-                new_bill = pd.DataFrame([{
-                    "Bill_ID": bid,
-                    "Patient": patient,
-                    "Amount": amount,
-                    "Date": datetime.today().strftime('%Y-%m-%d')
-                }])
+    if st.button("Create Engagement"):
+        st.session_state.engagements.append({
+            "id":len(st.session_state.engagements),
+            "client":client,
+            "process":process,
+            "fy":fy,
+            "auditor":auditor,
+            "auditee":auditee,
+            "dept":dept,
+            "title":title,
+            "signed":False
+        })
+        log("Engagement Created")
+        st.success("Created")
 
-                bill_df = pd.concat([bills, new_bill], ignore_index=True)
-                save(bill_df, BILL_FILE)
+    st.markdown("</div>",unsafe_allow_html=True)
 
-                st.success(f"✅ Bill Generated! ID: {bid}")
+# ------------------------ CHECKLIST ------------------------
+CHECKLIST = ["Planning","Risk Assessment","Control Testing","Evidence","Conclusion"]
+DOCS = ["Scoping Memo","Audit Report","RCM","Audit Program","Workpapers","Evidence"]
 
-# --------------------------
-# Records
-# --------------------------
-elif menu == "Records":
-    st.header("📁 Records")
+def checklist():
+    st.markdown("<div class='section'>",unsafe_allow_html=True)
+    st.subheader("✅ QA Checklist")
 
-    tab1, tab2, tab3, tab4 = st.tabs(["Patients", "Doctors", "Appointments", "Billing"])
+    if not st.session_state.engagements:
+        st.warning("Create engagement first")
+        return
 
-    with tab1:
-        st.dataframe(patients)
+    eng = st.selectbox(
+        "Select Engagement",
+        st.session_state.engagements,
+        format_func=lambda x: f"{x['client']} - {x['process']}"
+    )
 
-    with tab2:
-        st.dataframe(doctors)
+    st.write("### 📎 Mandatory Documents + Archive")
+    for d in DOCS:
+        st.file_uploader(d, key=f"{eng['id']}_{d}")
 
-    with tab3:
-        st.dataframe(appointments)
+        if st.button(f"Archive {d}", key=f"{eng['id']}_{d}_archive"):
+            st.session_state.archive.append({
+                "Document":d,
+                "User":st.session_state.user,
+                "Time":datetime.datetime.now()
+            })
+            log(f"{d} archived")
+            st.success(f"{d} archived")
 
-    with tab4:
-        st.dataframe(bills)
+    st.divider()
+
+    for step in CHECKLIST:
+        st.write(f"### 🔹 {step}")
+
+        st.file_uploader("Upload Evidence", key=f"{eng['id']}_{step}")
+
+        remark = st.text_area("Remarks", key=f"{eng['id']}_{step}_r")
+
+        c1,c2,c3 = st.columns(3)
+
+        if c1.button("Pass", key=f"{eng['id']}_{step}_p"):
+            save(step,"Pass",remark)
+
+        if c2.button("Fail", key=f"{eng['id']}_{step}_f"):
+            save(step,"Fail",remark)
+
+        if c3.button("N/A", key=f"{eng['id']}_{step}_na"):
+            save(step,"NA",remark)
+
+        if st.button("💬 Chat Assist", key=f"{eng['id']}_{step}_chat"):
+            st.info("Suggestion: Improve documentation and testing clarity.")
+
+    if st.button("✅ Sign-off QA"):
+        eng["signed"]=True
+        log("Signed Off")
+        st.success("Signed Off")
+
+    st.markdown("</div>",unsafe_allow_html=True)
+
+def save(step,result,remark):
+    st.session_state.qa.append({
+        "step":step,
+        "result":result,
+        "remark":remark,
+        "user":st.session_state.user,
+        "time":datetime.datetime.now()
+    })
+    log(f"{step} {result}")
+    st.success("Saved")
+
+# ------------------------ REPORT ------------------------
+def report():
+    st.markdown("<div class='section'>",unsafe_allow_html=True)
+    st.subheader("📄 Final Report")
+
+    df=pd.DataFrame(st.session_state.qa)
+    st.dataframe(df)
+
+    st.download_button("Export Excel",df.to_csv(index=False),"QA_Report.csv")
+
+    if st.button("💬 Refine Report"):
+        st.info("Improve executive summary and observations.")
+
+    st.markdown("</div>",unsafe_allow_html=True)
+
+# ------------------------ LOGS ------------------------
+def logs():
+    st.markdown("<div class='section'>",unsafe_allow_html=True)
+    st.subheader("📜 Audit Logs")
+    st.dataframe(pd.DataFrame(st.session_state.logs))
+    st.markdown("</div>",unsafe_allow_html=True)
+
+# ------------------------ ARCHIVE ------------------------
+def archive():
+    st.markdown("<div class='section'>",unsafe_allow_html=True)
+    st.subheader("📦 Archive Repository")
+    st.dataframe(pd.DataFrame(st.session_state.archive))
+    st.markdown("</div>",unsafe_allow_html=True)
+
+# ------------------------ MAIN ------------------------
+if not st.session_state.login:
+    login()
+else:
+    header()
+
+    menu = st.selectbox("Navigate",[
+        "Home","Dashboard","Client","Engagement",
+        "Checklist","Report","Logs","Archive"
+    ])
+
+    if menu=="Home":
+        st.markdown("<div class='section'>",unsafe_allow_html=True)
+        st.subheader("🏠 Home")
+        st.write("Enterprise Internal Audit QA System with structured workflow, document controls, and reporting.")
+        st.markdown("</div>",unsafe_allow_html=True)
+
+    elif menu=="Dashboard":
+        dashboard()
+
+    elif menu=="Client":
+        client()
+
+    elif menu=="Engagement":
+        engagement()
+
+    elif menu=="Checklist":
+        checklist()
+
+    elif menu=="Report":
+        report()
+
+    elif menu=="Logs":
+        logs()
+
+    elif menu=="Archive":
+        archive()
